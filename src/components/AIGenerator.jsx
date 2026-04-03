@@ -21,7 +21,7 @@ export default function AIGenerator({ apiKey, onAddMultiple }) {
     setError(null);
     
     try {
-      const prompt = `Generate a JSON array of exactly ${count} English words and their Korean meanings related to the topic: "${topic}". Format exactly and only like this: [{"en": "apple", "ko": "사과"}]. Do not output any markdown code blocks, just raw JSON. Ensure the output is valid JSON.`;
+      const prompt = `Generate a JSON array of exactly ${count} English words and their Korean meanings related to the topic: "${topic}". Also, for each word, provide one very practical, well-structured, and natural English example sentence (formal or conversational depending on the context of the word) and its Korean translation. Format EXACTLY and ONLY like this: [{"en": "apple", "ko": "사과", "example": "I ate a delicious apple.", "exampleKo": "나는 맛있는 사과를 먹었다."}]. Do not output any markdown code blocks or additional texts, just pure JSON data. Ensure the output is safely parseable valid JSON.`;
       
       const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
         method: 'POST',
@@ -36,7 +36,6 @@ export default function AIGenerator({ apiKey, onAddMultiple }) {
       
       let text = data.candidates[0].content.parts[0].text;
       
-      // Clean possible Markdown wrappers
       if (text.startsWith('```json')) text = text.replace(/```json/g, '').replace(/```/g, '').trim();
       else if (text.startsWith('```')) text = text.replace(/```/g, '').trim();
       
@@ -46,14 +45,16 @@ export default function AIGenerator({ apiKey, onAddMultiple }) {
       const newWords = words.filter(w => w.en && w.ko).map(w => ({
         id: Date.now() + Math.random(),
         en: String(w.en).trim(),
-        ko: String(w.ko).trim()
+        ko: String(w.ko).trim(),
+        example: w.example ? String(w.example).trim() : '',
+        exampleKo: w.exampleKo ? String(w.exampleKo).trim() : ''
       }));
 
       onAddMultiple(newWords);
-      setTopic(''); // Reset on success
+      setTopic('');
     } catch (err) {
       console.error(err);
-      setError('단어 생성에 실패했습니다. API 키가 유효한지 확인하거나 잠시 후 다시 시도해주세요.');
+      setError('단어 생성에 실패했습니다. (응답 구조 오류 또는 API 키 만료)');
     } finally {
       setLoading(false);
     }
@@ -62,12 +63,12 @@ export default function AIGenerator({ apiKey, onAddMultiple }) {
   return (
     <div className="glass-panel fade-in" style={{ marginTop: '1.5rem', background: 'rgba(99, 102, 241, 0.08)', border: '1px solid rgba(99, 102, 241, 0.3)' }}>
       <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', color: '#a5b4fc', fontSize: '1.1rem' }}>
-        <Sparkles size={20} /> AI 자동 추가하기
+        <Sparkles size={20} /> AI로 단어 및 예문 자동 추가 (추천!)
       </h3>
       <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'flex-start' }}>
         <input 
           type="text" 
-          placeholder="주제 입력 (예: IT 개발자가 자주 쓰는 단어)" 
+          placeholder="주제 입력 (예: IT 개발자가 자주 쓰는 표현)" 
           value={topic}
           onChange={e => setTopic(e.target.value)}
           style={{ flex: '1 1 200px' }}

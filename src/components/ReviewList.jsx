@@ -2,6 +2,7 @@ import { Volume2, CheckCircle2, Play } from 'lucide-react';
 
 export default function ReviewList({ wrongWords, onRemove, onStartTest }) {
   const speak = (text) => {
+    if (!text) return;
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = 'en-US';
     const voices = window.speechSynthesis.getVoices();
@@ -40,26 +41,55 @@ export default function ReviewList({ wrongWords, onRemove, onStartTest }) {
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
         {wrongWords.map(word => (
-          <div key={word.id} className="glass-panel word-item list-enter" style={{ borderLeft: '4px solid var(--danger)' }}>
-            <div className="word-info">
-              <span className="word-en">
-                {word.en}
-                <button className="icon-btn speak" onClick={() => speak(word.en)} title="발음 듣기">
-                  <Volume2 size={24} strokeWidth={2.5} />
+          <div 
+            key={word.id} 
+            className="glass-panel word-item list-enter" 
+            style={{ borderLeft: '4px solid var(--danger)', display: 'flex', flexDirection: 'column', alignItems: 'stretch' }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div className="word-info">
+                <span className="word-en">
+                  {word.en}
+                  <button className="icon-btn speak" onClick={() => speak(word.en)} title="발음 듣기">
+                    <Volume2 size={24} strokeWidth={2.5} />
+                  </button>
+                </span>
+                <span className="word-ko">{word.ko}</span>
+              </div>
+              <div className="word-actions">
+                <button 
+                  className="icon-btn" 
+                  style={{ color: 'var(--success)' }} 
+                  onClick={() => onRemove(word.id)} 
+                  title="외웠음! (오답표에서 지우기)"
+                >
+                  <CheckCircle2 size={28} />
                 </button>
-              </span>
-              <span className="word-ko">{word.ko}</span>
+              </div>
             </div>
-            <div className="word-actions">
-              <button 
-                className="icon-btn" 
-                style={{ color: 'var(--success)' }} 
-                onClick={() => onRemove(word.id)} 
-                title="외웠음! (오답표에서 지우기)"
-              >
-                <CheckCircle2 size={28} />
-              </button>
-            </div>
+
+            {word.example && (
+              <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px dashed var(--glass-border)' }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
+                  <span style={{ fontStyle: 'italic', color: '#e2e8f0', flex: 1, lineHeight: '1.4' }}>
+                    "{word.example}"
+                  </span>
+                  <button 
+                    className="icon-btn speak" 
+                    onClick={() => speak(word.example)} 
+                    title="예문 듣기" 
+                    style={{ padding: '0.2rem', color: '#a5b4fc' }}
+                  >
+                    <Volume2 size={18} />
+                  </button>
+                </div>
+                {word.exampleKo && (
+                  <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '0.4rem' }}>
+                    {word.exampleKo}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         ))}
       </div>

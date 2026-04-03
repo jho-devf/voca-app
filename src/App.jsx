@@ -36,8 +36,8 @@ function App() {
     else localStorage.removeItem('voca_apikey');
   }, [apiKey]);
 
-  const handleAddWord = (en, ko) => {
-    setWords([{ id: Date.now(), en, ko }, ...words]);
+  const handleAddWord = (en, ko, example = '', exampleKo = '') => {
+    setWords([{ id: Date.now(), en, ko, example, exampleKo }, ...words]);
   };
 
   const handleAddMultiple = (newWords) => {
@@ -46,7 +46,7 @@ function App() {
 
   const handleDeleteWord = (id) => {
     setWords(words.filter(w => w.id !== id));
-    setWrongWordIds(prev => prev.filter(wId => wId !== id)); // 오답 노트에서도 동시 삭제
+    setWrongWordIds(prev => prev.filter(wId => wId !== id)); 
   };
 
   const handleWrongAnswer = (id) => {
@@ -92,7 +92,7 @@ function App() {
         </button>
         
         <h1 className="app-title text-gradient">VocabMaster</h1>
-        <p className="app-subtitle">나만의 영단어장과 함께 완벽하게 암기하세요 ✨</p>
+        <p className="app-subtitle">단어부터 예문까지, 완벽한 어휘 체화 서비스 ✨</p>
       </header>
       
       <nav className="nav-tabs">
@@ -132,7 +132,7 @@ function App() {
             words={activeTestWords} 
             onWrongAnswer={handleWrongAnswer} 
             onCorrectAnswer={handleCorrectAnswer}
-            key={testMode} // mode가 바뀔 때 상태 초기화
+            key={testMode} 
           />
         )}
 
@@ -145,7 +145,6 @@ function App() {
         )}
       </main>
 
-      {/* Settings Modal */}
       {showSettings && (
         <div className="modal-overlay" onClick={() => setShowSettings(false)}>
           <div className="modal-content glass-panel fade-in" onClick={e => e.stopPropagation()}>
@@ -169,7 +168,7 @@ function App() {
                 onChange={e => setTempKey(e.target.value)}
               />
               <p style={{ marginTop: '0.75rem', fontSize: '0.85rem', color: '#94a3b8', lineHeight: '1.4' }}>
-                * 입력하신 API 키는 브라우저 내부 스토리지에만 보관되며, 그 어떤 외부 서버로도 전송되지 않습니다.<br/>
+                * 사이트를 닫아도 로컬스토리지에 안전하게 보관됩니다.<br/>
                 * <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" style={{ color: 'var(--primary)' }}>여기서 무료 키를 발급</a>받으실 수 있습니다.
               </p>
             </div>
