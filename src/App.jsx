@@ -119,7 +119,7 @@ function App() {
       <main>
         {activeTab === 'list' && (
           <div>
-            <AddWordForm onAdd={handleAddWord} onAddMultiple={handleAddMultiple} />
+            <AddWordForm apiKey={apiKey} onAddMultiple={handleAddMultiple} />
             <AIGenerator apiKey={apiKey} onAddMultiple={handleAddMultiple} />
             <div style={{ marginTop: '2rem' }}>
               <WordList words={words} onDelete={handleDeleteWord} />

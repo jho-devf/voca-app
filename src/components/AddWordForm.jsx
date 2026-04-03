@@ -1,62 +1,95 @@
 import { useState } from 'react';
-import { Plus, ListPlus, Type, ChevronDown, ChevronUp } from 'lucide-react';
+import { Plus, ListPlus, Type, Loader2 } from 'lucide-react';
 
-export default function AddWordForm({ onAdd, onAddMultiple }) {
+export default function AddWordForm({ apiKey, onAddMultiple }) {
   const [mode, setMode] = useState('single'); 
-  const [showAdvanced, setShowAdvanced] = useState(false);
   
   const [en, setEn] = useState('');
   const [ko, setKo] = useState('');
-  const [example, setExample] = useState('');
-  const [exampleKo, setExampleKo] = useState('');
-  
   const [bulkText, setBulkText] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleSingleSubmit = (e) => {
-    e.preventDefault();
-    if (!en.trim() || !ko.trim()) return;
-    onAdd(en.trim(), ko.trim(), example.trim(), exampleKo.trim());
-    setEn('');
-    setKo('');
-    setExample('');
-    setExampleKo('');
-    setShowAdvanced(false);
+  const fetchAIExamples = async (wordsArray) => {
+    if (!apiKey) {
+      alert("⚠️ 상단의 설정(⚙️) 아이콘을 눌러 구글 Gemini API 키를 먼저 등록해주세요.\n\n(설정된 키가 있어야 AI가 예문을 만들어드릴 수 있습니다)");
+      return;
+    }
+    
+    setLoading(true);
+    try {
+      const prompt = `You are a helpful English teacher API. I will give you a JSON array of words. For each object, keep purely the "en" and "ko" keys exactly as they are without modifying them, but generate and add TWO new string keys: "example" (a highly practical, natural English conversational sentence using the word) and "exampleKo" (a natural Korean translation of that sentence). Return exactly the updated JSON array, without any markdown formatting or extra text. Output strictly JSON array format.\n\nHere is the input array: ${JSON.stringify(wordsArray)}`;
+      
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }]
+        })
+      });
+      
+      const data = await res.json();
+      if (data.error) throw new Error(data.error.message || 'API Error');
+      
+      let text = data.candidates[0].content.parts[0].text;
+      if (text.startsWith('```json')) text = text.replace(/```json/g, '').replace(/```/g, '').trim();
+      else if (text.startsWith('```')) text = text.replace(/```/g, '').trim();
+      
+      const generatedWords = JSON.parse(text);
+      if (!Array.isArray(generatedWords)) throw new Error('Invalid format returned by AI');
+      
+      const finalWords = generatedWords.map(w => ({
+        id: Date.now() + Math.random(),
+        en: String(w.en || '').trim(),
+        ko: String(w.ko || '').trim(),
+        example: String(w.example || '').trim(),
+        exampleKo: String(w.exampleKo || '').trim()
+      }));
+
+      onAddMultiple(finalWords);
+      
+      if (mode === 'single') {
+        setEn(''); setKo('');
+      } else {
+        setBulkText('');
+      }
+    } catch (error) {
+      console.error(error);
+      alert("❗ AI 예문 생성에 실패했습니다.\n입력값이 너무 많거나 API 키가 유효한지 다시 확인해주세요.");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleBulkSubmit = (e) => {
+  const handleSingleSubmit = async (e) => {
     e.preventDefault();
-    if (!bulkText.trim() || !onAddMultiple) return;
+    if (!en.trim() || !ko.trim()) return;
+    
+    await fetchAIExamples([{ en: en.trim(), ko: ko.trim() }]);
+  };
+
+  const handleBulkSubmit = async (e) => {
+    e.preventDefault();
+    if (!bulkText.trim()) return;
     
     const lines = bulkText.split('\n');
-    const newWords = [];
+    const parsedWords = [];
     
     lines.forEach(line => {
       const parts = line.split(/[,:\-\t]/).map(s => s.trim()).filter(Boolean);
       if (parts.length >= 2) {
-        newWords.push({
-          id: Date.now() + Math.random(),
-          en: parts[0],
-          ko: parts.slice(1).join(', '),
-          example: '', exampleKo: ''
-        });
+        parsedWords.push({ en: parts[0], ko: parts.slice(1).join(', ') });
       } else {
         const spaceParts = line.trim().split(' ').map(s => s.trim()).filter(Boolean);
         if (spaceParts.length >= 2) {
-          newWords.push({
-            id: Date.now() + Math.random(),
-            en: spaceParts[0],
-            ko: spaceParts.slice(1).join(' '),
-            example: '', exampleKo: ''
-          });
+          parsedWords.push({ en: spaceParts[0], ko: spaceParts.slice(1).join(' ') });
         }
       }
     });
 
-    if (newWords.length > 0) {
-      onAddMultiple(newWords);
-      setBulkText('');
+    if (parsedWords.length > 0) {
+      await fetchAIExamples(parsedWords);
     } else {
-      alert("단어와 뜻이 올바르게 구분된 텍스트를 입력해주세요.");
+      alert("단어와 뜻이 올바르게 구분된 텍스트를 하나 이상 입력해주세요.");
     }
   };
 
@@ -64,7 +97,7 @@ export default function AddWordForm({ onAdd, onAddMultiple }) {
     <div className="glass-panel fade-in" style={{ marginBottom: '0.5rem' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '1rem' }}>
         <h3 style={{ margin: 0, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <Plus size={20} /> 단어 직접 입력
+          <Plus size={20} /> 단어 입력 (예문 자동 생성 ✨)
         </h3>
         
         <div style={{ display: 'flex', gap: '0.5rem' }}>
@@ -76,8 +109,9 @@ export default function AddWordForm({ onAdd, onAddMultiple }) {
               background: mode === 'single' ? 'var(--primary)' : 'rgba(255,255,255,0.05)',
               color: mode === 'single' ? '#fff' : 'var(--text-muted)'
             }}
+            disabled={loading}
           >
-            단건 및 예문 추가
+            단건 추가
           </button>
           <button 
             type="button" 
@@ -87,6 +121,7 @@ export default function AddWordForm({ onAdd, onAddMultiple }) {
               background: mode === 'bulk' ? 'var(--primary)' : 'rgba(255,255,255,0.05)',
               color: mode === 'bulk' ? '#fff' : 'var(--text-muted)'
             }}
+            disabled={loading}
           >
             대량 추가 (텍스트)
           </button>
@@ -102,6 +137,7 @@ export default function AddWordForm({ onAdd, onAddMultiple }) {
                 placeholder="영어 단어 (예: Apple)" 
                 value={en} 
                 onChange={(e) => setEn(e.target.value)} 
+                disabled={loading}
               />
             </div>
             <div style={{ flex: '1 1 200px' }}>
@@ -110,62 +146,43 @@ export default function AddWordForm({ onAdd, onAddMultiple }) {
                 placeholder="한국어 뜻 (예: 사과)" 
                 value={ko} 
                 onChange={(e) => setKo(e.target.value)} 
+                disabled={loading}
               />
             </div>
           </div>
           
-          {showAdvanced && (
-            <div className="fade-in" style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginBottom: '1rem', paddingTop: '0.5rem', borderTop: '1px dashed var(--glass-border)' }}>
-              <div style={{ flex: '1 1 200px' }}>
-                <input 
-                  type="text" 
-                  placeholder="예문 (선택)" 
-                  value={example} 
-                  onChange={(e) => setExample(e.target.value)} 
-                />
-              </div>
-              <div style={{ flex: '1 1 200px' }}>
-                <input 
-                  type="text" 
-                  placeholder="예문 해석 (선택)" 
-                  value={exampleKo} 
-                  onChange={(e) => setExampleKo(e.target.value)} 
-                />
-              </div>
-            </div>
-          )}
-
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <button 
-              type="button" 
-              onClick={() => setShowAdvanced(!showAdvanced)} 
-              style={{ color: 'var(--text-muted)', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.2rem' }}
-            >
-              {showAdvanced ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-              {showAdvanced ? '예문 입력창 닫기' : '예문 추가하기 (선택)'}
-            </button>
-            <button type="submit" className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Type size={20} /> 추가
+            <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+              * 추가 시 AI가 예문을 자동으로 만들어줍니다.
+            </span>
+            <button type="submit" className="btn-primary" disabled={loading} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              {loading ? <Loader2 size={20} className="spin" /> : <Type size={20} />} 
+              {loading ? 'AI 분석 및 예문 생성 중...' : '추가하기'}
             </button>
           </div>
         </form>
       ) : (
         <form onSubmit={handleBulkSubmit} className="fade-in">
           <textarea 
-            placeholder="단어와 뜻을 입력해주세요.&#13;&#10;예시:&#13;&#10;Apple - 사과&#13;&#10;Banana, 바나나&#13;&#10;(다중 추가에서는 예문을 자동 등록할 수 없습니다. AI 추가 기능을 이용해보세요!)"
+            placeholder="단어와 뜻을 입력해주세요.&#13;&#10;예시:&#13;&#10;Apple - 사과&#13;&#10;Banana, 바나나"
             value={bulkText}
             onChange={(e) => setBulkText(e.target.value)}
+            disabled={loading}
             style={{ 
               width: '100%', minHeight: '120px', background: 'var(--glass-bg)', 
               border: '1px solid var(--glass-border)', color: 'var(--text-main)', 
               padding: '1rem', borderRadius: '8px', outline: 'none', 
               fontFamily: 'inherit', resize: 'vertical', lineHeight: '1.5',
-              marginBottom: '1rem'
+              marginBottom: '1rem', opacity: loading ? 0.7 : 1
             }}
           />
-          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-            <button type="submit" className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <ListPlus size={20} /> 텍스트로 일괄 추가
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+              * 추가 버튼을 누르면 모든 문장에 대해 상황에 맞는 예문을 제공합니다.
+            </span>
+            <button type="submit" className="btn-primary" disabled={loading} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              {loading ? <Loader2 size={20} className="spin" /> : <ListPlus size={20} />} 
+              {loading ? 'AI 전체 문장 분석 중...' : '텍스트 일괄 추가'}
             </button>
           </div>
         </form>
