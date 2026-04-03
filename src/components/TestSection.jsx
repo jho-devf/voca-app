@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { RefreshCw, Play, ArrowLeft } from 'lucide-react';
+import { Play, ArrowLeft, ArrowRight } from 'lucide-react';
 
 export default function TestSection({ words, onWrongAnswer, onCorrectAnswer }) {
   const [stages, setStages] = useState([]);
+  const [currentStageIndex, setCurrentStageIndex] = useState(null);
   const [testWords, setTestWords] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [inputVal, setInputVal] = useState('');
@@ -18,13 +19,11 @@ export default function TestSection({ words, onWrongAnswer, onCorrectAnswer }) {
     }
     const shuffled = [...words].sort(() => 0.5 - Math.random());
     const N = shuffled.length;
-    // 30을 기준으로 적절히 나눕니다. 최대 30문제 내외로 배정
     let K = Math.max(1, Math.ceil(N / 30));
     
     const newStages = [];
     let startIdx = 0;
     for (let i = 0; i < K; i++) {
-        // 나머지를 앞 단계들에 1개씩 분배하여 모든 단계가 거의 비슷한 길이를 가지게 함
         const extra = i < (N % K) ? 1 : 0;
         const chunkSize = Math.floor(N / K) + extra;
         const chunkWords = shuffled.slice(startIdx, startIdx + chunkSize);
@@ -34,8 +33,8 @@ export default function TestSection({ words, onWrongAnswer, onCorrectAnswer }) {
     setStages(newStages);
   }, [words]);
 
-  const startTest = (targetWords) => {
-    // 묶음 내부에서도 한 번 더 랜덤하게 섞어 출제
+  const startTest = (targetWords, stageIdx = null) => {
+    setCurrentStageIndex(stageIdx);
     const shuffled = [...targetWords].sort(() => 0.5 - Math.random());
     setTestWords(shuffled);
     setCurrentIndex(0);
@@ -47,6 +46,7 @@ export default function TestSection({ words, onWrongAnswer, onCorrectAnswer }) {
   };
 
   const handleReturn = () => {
+    setCurrentStageIndex(null);
     setIsStarted(false);
     setIsFinished(false);
   };
@@ -78,7 +78,7 @@ export default function TestSection({ words, onWrongAnswer, onCorrectAnswer }) {
     if (isCorrect) {
       setFeedback('success');
       setScore(s => s + 1);
-      speak(currentWord.en); // 정답일 경우 발음 읽어주기!
+      speak(currentWord.en); 
       if (onCorrectAnswer) onCorrectAnswer(currentWord.id);
     } else {
       setFeedback('error');
@@ -120,7 +120,7 @@ export default function TestSection({ words, onWrongAnswer, onCorrectAnswer }) {
              <button 
                key={idx} 
                className="btn-primary" 
-               onClick={() => startTest(stageWords)} 
+               onClick={() => startTest(stageWords, idx)} 
                style={{ 
                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                  padding: '1rem 1.5rem', background: 'rgba(255,255,255,0.05)', 
@@ -134,7 +134,7 @@ export default function TestSection({ words, onWrongAnswer, onCorrectAnswer }) {
           
           <button 
             className="btn-primary" 
-            onClick={() => startTest(words)} 
+            onClick={() => startTest(words, null)} 
             style={{ 
               display: 'flex', justifyContent: 'center', gap: '0.5rem', 
               padding: '1.2rem', marginTop: '1.5rem', background: 'var(--primary)',
@@ -150,15 +150,38 @@ export default function TestSection({ words, onWrongAnswer, onCorrectAnswer }) {
   }
 
   if (isFinished) {
+    const hasNextStage = currentStageIndex !== null && currentStageIndex + 1 < stages.length;
+
     return (
       <div className="glass-panel fade-in" style={{ textAlign: 'center', padding: '4rem 2rem' }}>
         <h2 className="app-title text-gradient">스테이지 클리어! 🎉</h2>
         <p style={{ fontSize: '1.5rem', margin: '2rem 0', color: 'var(--text-main)' }}>
           총 {testWords.length}문제 중 <strong style={{ color: 'var(--primary)', fontSize: '2.5rem', margin: '0 0.5rem' }}>{score}</strong>문제를 맞혔습니다!
         </p>
-        <button className="btn-primary" onClick={handleReturn} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', fontSize: '1.1rem' }}>
-          <ArrowLeft size={20} /> 스테이지 목록으로 돌아가기
-        </button>
+        
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', alignItems: 'center', marginTop: '2.5rem' }}>
+          {hasNextStage ? (
+            <>
+              <button 
+                className="btn-primary" 
+                onClick={() => startTest(stages[currentStageIndex + 1], currentStageIndex + 1)} 
+                style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1.2rem', padding: '1rem 2rem' }}
+              >
+                다음 {currentStageIndex + 2}단계 연속 진행 <ArrowRight size={22} />
+              </button>
+              <button 
+                onClick={handleReturn} 
+                style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', textDecoration: 'underline', marginTop: '0.5rem', fontSize: '1rem' }}
+              >
+                진행 멈추고 메뉴로 가기
+              </button>
+            </>
+          ) : (
+            <button className="btn-primary" onClick={handleReturn} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1.1rem' }}>
+              <ArrowLeft size={20} /> 스테이지 목록으로 돌아가기
+            </button>
+          )}
+        </div>
       </div>
     );
   }
@@ -171,10 +194,11 @@ export default function TestSection({ words, onWrongAnswer, onCorrectAnswer }) {
         <button className="icon-btn" onClick={handleReturn} title="그만두고 뒤로가기">
           <ArrowLeft size={24} />
         </button>
-        <div style={{ color: 'var(--primary)', letterSpacing: '2px', fontWeight: 700, fontSize: '0.9rem' }}>
+        <div style={{ color: 'var(--primary)', letterSpacing: '2px', fontWeight: 700, fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          {currentStageIndex !== null && <span style={{ color: 'var(--text-main)', opacity: 0.8 }}>[{currentStageIndex + 1}단계]</span>}
           QUESTION {currentIndex + 1} OF {testWords.length}
         </div>
-        <div style={{ width: 24 }}></div> {/* 중앙 정렬 맞춤용 */}
+        <div style={{ width: 24 }}></div>
       </div>
       
       <div className="test-word text-gradient">
